@@ -1,0 +1,362 @@
+---
+title: "A response to the MPS Report on the s163 Road Traffic Act Ethnicity Recording Pilot"
+subtitle: $\color{red}{\text{NOT FOR SHARING}}$
+author: "Dr Jolyon Miles-Wilson"
+date: "August 2022"
+output: 
+  bookdown::html_document2:
+    code_folding: show
+bibliography: "mps pilot check.bib"
+suppress-bibliography: true
+csl: chicago-fullnote-bibliography.csl
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+knitr::opts_chunk$set(include = F)
+knitr::opts_chunk$set(message = F)
+knitr::opts_chunk$set(warning = F)
+```
+
+```{r}
+library(gmodels)
+library(tidyverse)
+library(kableExtra)
+```
+
+```{r}
+stops_data <- data.frame("Ethnicity" = c("Asian",
+                                         "Black",
+                                         "Mixed",
+                                         "Not recorded",
+                                         "Other",
+                                         "White British",
+                                         "White Other"),
+                         "Stops" = c(1515,
+                                     1246,
+                                     160,
+                                     323,
+                                     336,
+                                     2229,
+                                     1747)
+
+)
+
+type_of_stop <- data.frame("Ethnicity" = c("Asian",
+                                         "Black",
+                                         "Mixed",
+                                         "Not recorded",
+                                         "Other",
+                                         "White British",
+                                         "White Other"),
+                           "ANPR - Other" = c(.01,
+                                      .02,
+                                      .03,
+                                      .01,
+                                      .01,
+                                      .02,
+                                      .02),
+                           "ANPR - PNC Action Report" = c(.02,
+                                                          .01,
+                                                          .01,
+                                                          .05,
+                                                          .01,
+                                                          .01,
+                                                          .02),
+                           "Moving road traffic offence" = c(.82,
+                                                             .84,
+                                                             .81,
+                                                             .81,
+                                                             .84,
+                                                             .77,
+                                                             .76),
+                           "Road traffic collision" = c(.13,
+                                                        .11,
+                                                        .13,
+                                                        .11,
+                                                        .10,
+                                                        .19,
+                                                        .18),
+                           "Other" = c(.03,
+                                       .02,
+                                       .03,
+                                       .02,
+                                       .04,
+                                       .02,
+                                       .03)
+)
+
+combined_data <- sweep(type_of_stop[,2:6], MARGIN = 1,stops_data$Stops,'*') %>% # multiply whole df by vector
+  round(,0) %>%
+  add_column("Ethnicity" = type_of_stop$Ethnicity,.before = 1) %>%
+  merge(stops_data, by = "Ethnicity") %>%
+  relocate(
+    Stops, .after = Ethnicity
+    
+  )
+```
+
+
+```{r}
+# moving road traffic offence
+moving_rt <- combined_data %>%
+  filter(Ethnicity == "Black" | Ethnicity == "White British") %>%
+  select(c(Ethnicity,Moving.road.traffic.offence)) %>%
+  add_column("Pop" = c(1252755,3511979)) %>%
+  mutate(
+    "Not_moving_rt" = Pop - Moving.road.traffic.offence
+  )
+
+b <- data.frame("black" = c(moving_rt$Moving.road.traffic.offence[which(moving_rt$Ethnicity == "Black")],
+                            moving_rt$Not_moving_rt[which(moving_rt$Ethnicity == "Black")])) # total is supposed to be 1252755
+w <- data.frame("white" = c(moving_rt$Moving.road.traffic.offence[which(moving_rt$Ethnicity == "White British")],
+                            moving_rt$Not_moving_rt[which(moving_rt$Ethnicity == "White British")]))
+df <- cbind(b,w)
+rownames(df) <- c("stopped","not stopped")
+mat <- as.matrix(df)
+
+xtab <- CrossTable(mat, chisq = T, fisher = T, expected = T)
+```
+
+
+From January to June 2021, the Metropolitan Police Service (MPS) Deputy Commissioner's Delivery Group and Roads and Transport Policing Command conducted a pilot (**ref to report**) to record the ethnic background of drivers stopped by police under Section 136 of the Road Traffic Act [@participation_road_nodate]. This involved officers asking for and recording the self-defined ethnicity of every driver stopped under Section 163 of the Road Traffic Act. 
+
+In total 7,556 stops were recorded as part of the pilot. The MPS provided a breakdown of these stops according to the individual's ethnicity. The report compared these percentages with 2016-based population projections for the year 2021 provided by the Greater London Authority [@gla_ethnic_nodate]. These breakdowns and comparisons are presented in Table \@ref(tab:ethnic-breakdown) as they are presented in the MPS report. Commenting on the comparison of the rate of Black drivers stopped and the estimated proportion of the population who were Black, the report states "there was no clear difference between the proportion of stops recorded on the pilot and the projections" (p. 2). 
+
+```{r ethnic-breakdown, include = T}
+data.frame("Ethnicity" = c("Asian",
+                                         "Black",
+                                         "Mixed",
+                                         "Not recorded",
+                                         "Other",
+                                         "White British",
+                                         "White Other"),
+                         "Stops" = c(1515,
+                                     1246,
+                                     160,
+                                     323,
+                                     336,
+                                     2229,
+                                     1747),
+                         "Percentage of stops" = c(20.1,
+                                                   16.5,
+                                                   2.1,
+                                                   4.3,
+                                                   4.4,
+                                                   29.5,
+                                                   23.1),
+                         "GLA Population Projection (%)" = c(19.1,
+                                                         13.5,
+                                                         5.8,
+                                                         NA,
+                                                         5.8,
+                                                         37.8,
+                                                         18)
+
+) %>%
+  kable(caption = "Number of stops broken down by ethnicity (reproduced from MPS report)", col.names = c("Ethnicity","Number of stops","Percentage of all stops","GLA Population Projection (%)")) %>%
+  kable_styling()
+
+```
+
+
+The report provided no indication as to how this inference was reached, and the reader can therefore only assume that this deduction was made by comparing the percentages in Table \@ref(tab:ethnic-breakdown) by eye and making a judgement based on the similarity of the numbers (i.e., comparing the figures in columns 3 and 4). However, comparison of percentages in this way is not an accurate method for determining differences because it requires a judgement on *how different the numbers need to be* for a difference to be "noteworthy". Such a judgement is usually not appropriate as it doesn't take into account the different sizes of the populations of interest. For example, a 1% difference in a population of 100 equates to just one person, but a 1% difference in a population of 1000 equates to a difference of 10 people. Instead, researchers typically make use of statistical tests that take into account the differences in population sizes, and which enable them to quantify how big a difference is as well as whether that difference is noteworthy. When comparing the incidence of events such as how often people are stopped and searched, it is common practice to calculate the odds ratio, which describe how much more or less likely it is for a person from one group to be stopped compared to a person from another group. In the present context, the odds ratio makes it possible to compare the rate at which Black people were stopped in the pilot with the rate at which white people were stopped and quantify how much more or less likely it was for a Black person to be stopped compared to a white person. 
+
+Here, we demonstrate how to do this, using the limited data and information that is available in the police report. Using the 2016-based GLA Population Projections [@gla_ethnic_nodate] for the year 2021 as the MPS report did, the population estimate for the Black population (including Black African, Black Caribbean, and Black other) was 1,252,755, and the population estimate for the White British population was 3,511,979. Using this information and the data in Table \@ref(tab:ethnic-breakdown), it is possible to make a contingency table, which quantifies the number of Black people stopped, the number of Black people *not* stopped, the number of white people stopped, and the number of white people *not* stopped (Table \@ref(tab:contingency-tab)).
+
+```{r contingency-tab, include = T}
+b <- data.frame("Black" = c(1246,1251509)) # total is supposed to be 1252755
+w <- data.frame("White" = c(2229,3509750))
+df <- cbind(b,w)
+rownames(df) <- c("Stopped","Not stopped")
+mat <- as.matrix(df)
+
+mat %>%
+  kable(caption = "Number of people stopped and not stopped by ethnicity") %>%
+  kable_styling(full_width = F)
+
+```
+
+This contingency table can then used to calculate the odds ratio; that is, how much greater or smaller the odds of being stopped are for the Black population compared to the white population. This is achieved by first calculating the odds for each group by dividing the probability of a stop occurring for that group by the probability of a stop not occurring for that group:
+
+<br>
+
+$$
+\text{odds of being stopped = likelihood of being stopped / likelihood of not being stopped}
+$$
+
+<br>
+
+\begin{equation}
+\begin{split}
+
+\text{odds of a Black person being stopped} & = (1246 / 1252755) / (1251509 / 1252755) \\
+& = 0.00099 / 0.999 \\
+& = 0.000996
+
+\end{split}
+\end{equation}
+
+
+\begin{equation}
+\begin{split}
+
+\text{odds of a white person being stopped} & = (2229 / 3511979) / (3509750 / 3511979) \\
+& = 0.00063 / 0.9994 \\
+& = 0.000635
+
+\end{split}
+\end{equation}
+
+
+So, the odds of a Black person being stopped in the pilot was 0.000996, and the odds of a white person being stopped in the pilot was 0.000635. It is then possible to calculate the *ratio* between these odds by dividing one by the other:
+
+<br>
+
+$$
+\text{odds ratio = odds of a Black person being stopped / odds of a white person being stopped} 
+$$
+\begin{equation}
+\begin{split}
+
+\text{odds ratio} & = 0.000996 / 0.000635 \\
+& = 1.57
+
+\end{split}
+\end{equation}
+
+The result shows that Black people were **1.57 times more likely** than white people to be stopped in this pilot. Using *R* - a statistical software - it is possible to determine whether this value is statistically significant. A result is statistically significant if there is a low probability (usually less than 5%) that the result could be observed by chance. The code below shows how this analysis was achieved; a contingency table was created as outlined above, and then passed to the *CrossTable()* function from the *gmodels* package.  In this case, the probability (or "p-value") of the result having been observed by chance was less than 0.01%, strongly suggesting that the result was not due to chance (Table \@ref(tab:results-tab)).
+
+```{r include = T, echo = T, results='hide'}
+# create contingency table
+b <- data.frame("black" = c(1246,1251509)) # total population = 1252755
+w <- data.frame("white" = c(2229,3509750)) # total population = 3511979
+df <- cbind(b,w)
+rownames(df) <- c("stopped","not stopped")
+mat <- as.matrix(df)
+
+# run analysis
+xtab <- CrossTable(mat, chisq = T, fisher = T, expected = T)
+```
+
+
+```{r results-tab, include = T}
+# below function taken from https://jacintak.github.io/post/2021-05-01-formatting-p-values/
+# it automatically formats small p values for presentation in tables
+fixp <- function(x, dig=3){
+
+# Convert to a data frame
+  if(is.data.frame(x) | is.matrix(x)){
+  x <- as.data.frame(x)
+  } else {
+  x <- as.data.frame(x[[1]])
+  }
+
+# Check column order  
+  if(substr(names(x)[ncol(x)],1,2) != "Pr"){
+    warning("The name of the last column didn't start with Pr. This may indicate that p-values weren't in the last row, and thus, that this function is inappropriate.")
+    }
+    
+# Round P values to "dig" decimal places, default 3     
+  x[,ncol(x)] <- round(x[,ncol(x)], dig)
+
+#  
+  for(i in 1:nrow(x)){
+    if(x[i,ncol(x)] == 0 & !is.na(x[i,ncol(x)])){
+      x[i,ncol(x)] <- paste0("< 0.", paste0(rep(0,dig-1), collapse=""), "1")
+      }
+  }
+  x
+}
+
+
+data.frame("Odds ratio" = xtab[["fisher.ts"]][["estimate"]][["odds ratio"]],
+           "95% CI lower" = xtab[["fisher.ts"]][["conf.int"]][1],
+           "95% CI upper" = xtab[["fisher.ts"]][["conf.int"]][2],
+           
+                            "p-value" = xtab[["fisher.ts"]][["p.value"]]
+) %>%
+  fixp() %>%
+  kable(digits = 2, caption = "Statistics resulting from analysis", col.names = c("Odds ratio","95% CI Lower", "95% CI Upper","p value")) %>%
+  kable_styling(full_width = F)
+```
+
+This analysis can be conducted again to compare the rates of stops for the Black population with the rates of stops for the *entire* white populaiton, including White British, White Irish, and White other. The GLA population projection for this combined white population is 5,184,510. Table \@ref(tab:white-combined-tab) shows the resultant contingency table using this number.
+
+```{r white-combined-tab, include = T}
+b <- data.frame("Black" = c(1246,1251509)) 
+w <- data.frame("White" = c(2229,5182281))
+
+df <- cbind(b,w)
+rownames(df) <- c("Stopped","Not stopped")
+mat <- as.matrix(df)
+
+mat %>%
+  kable(caption = "Number of people stopped and not stopped by ethnicity (incl. all white categories)") %>%
+  kable_styling(full_width = F)
+
+```
+
+Using the contingency table above, the analysis can be conducted again with the combined population estimate. 
+
+```{r include = T, echo = T, results='hide'}
+# create contingency table
+b <- data.frame("black" = c(1246,1251509)) # total population = 1252755
+w <- data.frame("white" = c(2229,5182281)) # total population = 5184510
+
+df <- cbind(b,w)
+rownames(df) <- c("stopped","not stopped")
+mat <- as.matrix(df)
+
+# run analysis
+xtab <- CrossTable(mat, chisq = T, fisher = T, expected = T)
+```
+
+The result of this second analysis shows that when the rate of stops of all Black people are compared to the rates of stops of all white people (as opposed to just White *British* people), the disparity in stops is higher; Black people were **`r round(xtab[["fisher.ts"]][["estimate"]][["odds ratio"]],2)` times more likely** than white people to be stopped in the pilot. Table \@ref(tab:white-combined-results) shows the statistics from this analysis.
+
+```{r white-combined-results, include = T}
+data.frame("Odds ratio" = xtab[["fisher.ts"]][["estimate"]][["odds ratio"]],
+           "95% CI lower" = xtab[["fisher.ts"]][["conf.int"]][1],
+           "95% CI upper" = xtab[["fisher.ts"]][["conf.int"]][2],
+           
+                            "p-value" = xtab[["fisher.ts"]][["p.value"]]
+) %>%
+  fixp() %>%
+  kable(digits = 2, caption = "Statistics resulting from second analysis (white categories combined)", col.names = c("Odds ratio","95% CI Lower", "95% CI Upper","p value")) %>%
+  kable_styling(full_width = F)
+```
+
+
+```{r}
+# check mixed claim
+# create contingency table
+m <- data.frame("mixed" = c(160, 541024)) # total population = 1252755
+w <- data.frame("white" = c(2229,3509750)) # total population = 3511979
+df <- cbind(m,w)
+rownames(df) <- c("stopped","not stopped")
+mat <- as.matrix(df)
+
+# run analysis
+xtab <- CrossTable(mat, chisq = T, fisher = T, expected = T)
+```
+
+```{r}
+# check mixed claim
+# create contingency table
+m <- data.frame("mixed" = c(160, 541024)) # total population = 541184
+w <- data.frame("white" = c(2229, 5182281)) # total population = 5184510
+df <- cbind(m,w)
+rownames(df) <- c("stopped","not stopped")
+mat <- as.matrix(df)
+
+# run analysis
+xtab <- CrossTable(mat, chisq = T, fisher = T, expected = T)
+```
+
+The results show that when appropriate analyses are conducted on the data, there was a significant disparity in the rates at which Black and white people were stopped in the MPS pilot. During the pilot, a Black driver was **1.57** times more likely to be stopped than a White British person, and **2.31** times more likely to be stopped than a white person of any origin. This finding runs contrary to what has been inferred in the report and at public meetings, where it has been implied that there was no evidence of disparities since there was "no clear difference between the proportion of stops [of Black people] recorded on the pilot and the [GLA population] projections." We have highlighted how the method used to come to this conclusion was not appropriate for assessing whether disparities in stop rates exist, and we have shown that when appropriate analyses are conducted disparities are evident. We call on the authors of the MPS report to make revisions that include the statistical methods necessary to justify meaningful conclusions based on the data collected in the pilot. We also strongly encourage the authors to share their analyses and data so that others can reproduce their findings and have confidence in the assertions arising from them. 
+
+<!-- the below paragraph may be baseless -->
+
+<!-- The most common motivation for stops of people of all ethnicities was a Moving Road Traffic Offence (Table x, reproduced from the police report). when only these stops are considered (note that number of stops is based on total stops, but reasons were only recorded after the pilot had been running for a month), the disparity widens; Black drivers were 1.7 times more likely to be stopped than White British drivers. Though nothing can be conclusively asserted from these limited data, it is notable that the (biggest) disparity lies in a reason for stops that arguably involves the largest amount of officer discretion. That is, ANPR and traffic collision-related stops are at least partly determined by circumstances beyond officer decision-making, but moving traffic offences may involve officers' own judgements to a greater extent.   -->
+
+
